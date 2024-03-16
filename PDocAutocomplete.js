@@ -78,6 +78,7 @@ class PDokResults extends EventHandler {
 
       // fill input on enter
       if (e.key === "Enter") {
+        console.log(this.selected);
         this.fillInput(this.selected);
       }
     });
@@ -95,6 +96,7 @@ class PDokResults extends EventHandler {
   warn(warning) {
     this.root.blur();
     this.root.dataset.pdokStatus = "warn";
+    this.root.dataset.pdokMessage = warning;
     console.warn(warning);
   }
 
@@ -102,11 +104,12 @@ class PDokResults extends EventHandler {
     let style = document.createElement("style");
     style.innerHTML = `
       input:focus:not([data-pdok-status]) + .pdok-results {
-        display: block;
+        opacity:1;
+        transition-delay: 0s;
+        pointer-events: all;
       }
 
       .pdok-results {
-        display: none;
         position: absolute;
         z-index: 1000;
         background-color: white;
@@ -115,14 +118,17 @@ class PDokResults extends EventHandler {
         overflow-y: auto;
         list-style: none;
         padding: 0;
+        pointer-events: none;
+        opacity:0;
         margin: 0;
+        transition-delay: 0.1s;
       }
       .pdok-results li {
         padding: 10px;
         cursor: pointer;
       }
 
-      .pdok-results li.is-selected {
+      .pdok-results li:is(.is-selected, :hover) {
         background-color: #f5f5f5;
       }
 
@@ -186,14 +192,18 @@ class PDokResults extends EventHandler {
    * @returns void
    */
   fillInput(index) {
+    console.log({ index });
+
     // when there are options and index is not set, set it to 0
-    if (index === -1 || this.data.length > 0) index = 0;
+    if (index === -1 || (index === -1 && this.data.length > 0)) index = 0;
 
     // when this.data is empty, return
     if (this.data.length === 0) return;
 
     // this.root.value = this.data[index].address.formatted;
     this.emit("select", this.data[index]);
+
+    console.log(this.data[index], this.data, index);
 
     // fire input event
     let event = new Event("input", { bubbles: true });
@@ -213,16 +223,22 @@ class PDokResults extends EventHandler {
     this.results.classList.add("pdok-results");
     this.results.style.width = this.root.offsetWidth + "px";
 
+    console.log("render");
+
     // render new results
     for (let [index, result] of Object.entries(data)) {
       // create item
       let item = document.createElement("li");
 
       // set item content
-      item.innerHTML = result.highlight;
-
+      if (this.showHighlight) {
+        item.innerHTML = result.highlight;
+      } else {
+        item.innerHTML = result.address.formatted;
+      }
       // bind click event to fill input
-      item.addEventListener("click", () => this.fillInput(index));
+      console.log(item);
+      item.addEventListener("pointerdown", () => this.fillInput(index));
 
       // append item to results
       this.results.appendChild(item);
@@ -263,8 +279,17 @@ export default class PDokAutocomplete extends EventHandler {
       // filter out empty and undefined values
       if (isValid) {
         const info = await this.getInfo(data.address.formatted);
+        console.log(info);
+        this.root.value = info.address.formatted;
 
         this.results.check();
+        this.checked = true;
+
+        if (info.address.formatted !== data.address.formatted) {
+          this.results.warn(
+            "Het geselecteerde adres is niet hetzelfde als het gevonden adres"
+          );
+        }
         if (info?.warning) this.results.warn(info.warning);
         this.emit("select", info);
       }
@@ -278,6 +303,10 @@ export default class PDokAutocomplete extends EventHandler {
     // add event listeners
     this.root.addEventListener("input", (e) => {
       this.results.uncheck();
+      if (this?.checked) {
+        this.emit("unselect");
+        this.checked = false;
+      }
 
       this.input(e);
     });
@@ -301,6 +330,16 @@ export default class PDokAutocomplete extends EventHandler {
   async getInfo(q) {
     // do request
     let data = await this.doRequest("free", { q });
+
+    // format results
+    data = this.formatInfo(data);
+
+    return data;
+  }
+
+  async getInfoByID(id) {
+    // do request
+    let data = await this.doRequest("lookup", { id });
 
     // format results
     data = this.formatInfo(data);
@@ -337,11 +376,18 @@ export default class PDokAutocomplete extends EventHandler {
    * @returns {string} the formatted address
    */
   formatAddress(address) {
-    let postalCity = [address.postal, address.city].filter(Boolean).join(" ");
+    let postalCity = [address.city].filter(Boolean).join(" ");
     let streetHousenumber = [address.street, address.housenumber]
       .filter(Boolean)
       .join(" ");
-    return [postalCity, streetHousenumber].join(", ").trim() + " ";
+    let formatted = [postalCity, streetHousenumber].join(", ").trim();
+
+    // if we do not have a house number add spacing
+    if (!address.housenumber) {
+      formatted = `${formatted} `;
+    }
+
+    return formatted;
   }
 
   /**
@@ -440,6 +486,14 @@ export default class PDokAutocomplete extends EventHandler {
     // filter out empty results
     formattedDocs = formattedDocs.filter(Boolean);
 
+    // filter out duplicates
+    let formatted = formattedDocs.map((e) => e.address.formatted);
+
+    // filter out duplicates values of .address.formatted
+    formattedDocs = formattedDocs.filter(
+      (e, i) => formatted.indexOf(e.address.formatted) === i
+    );
+
     // return formatted results
     return formattedDocs;
   }
@@ -453,8 +507,8 @@ export default class PDokAutocomplete extends EventHandler {
     // get first docs
     let docs = data.response.docs;
 
-    // main doc is the first
-    data = docs[0];
+    // main doc is the first of type adres
+    data = docs.find((doc) => doc.type === "adres");
 
     // if no postcode try to find the next one
     if (!data.postcode) {
@@ -478,12 +532,13 @@ export default class PDokAutocomplete extends EventHandler {
     data.lat = parseFloat(lat);
     data.lng = parseFloat(lng);
 
-    data.address = this.formatAddress({
+    data.address = {
       street: data.straatnaam,
       housenumber: data.huis_nlt,
       postal: data.postcode,
       city: data.woonplaatsnaam,
-    });
+    };
+    data.address.formatted = this.formatAddress(data.address);
 
     // set country
     data.country = "Nederland";
