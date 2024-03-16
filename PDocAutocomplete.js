@@ -104,12 +104,11 @@ class PDokResults extends EventHandler {
     let style = document.createElement("style");
     style.innerHTML = `
       input:focus:not([data-pdok-status]) + .pdok-results {
-        opacity:1;
-        transition-delay: 0s;
-        pointer-events: all;
+        display:block;
       }
 
       .pdok-results {
+        display:none;
         position: absolute;
         z-index: 1000;
         background-color: white;
@@ -118,10 +117,7 @@ class PDokResults extends EventHandler {
         overflow-y: auto;
         list-style: none;
         padding: 0;
-        pointer-events: none;
-        opacity:0;
         margin: 0;
-        transition-delay: 0.1s;
       }
       .pdok-results li {
         padding: 10px;
