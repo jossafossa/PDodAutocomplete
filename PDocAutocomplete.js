@@ -1,3 +1,5 @@
+import { EventHandler } from "./EventHandler";
+
 /**
  * PDokAddress
  * @param {string} address.street - the street name
@@ -17,29 +19,6 @@ function PDokAddress({ street, housenumber, postal, city, formatted }) {
   };
 }
 
-class EventHandler {
-  constructor() {
-    this.events = {};
-  }
-
-  on(event, callback) {
-    this.events[event] = this.events[event] || [];
-    this.events[event].push(callback);
-  }
-
-  off(event, callback) {
-    if (this.events[event]) {
-      this.events[event] = this.events[event].filter((cb) => cb !== callback);
-    }
-  }
-
-  emit(event, ...args) {
-    if (this.events[event]) {
-      this.events[event].forEach((cb) => cb(...args));
-    }
-  }
-}
-
 /**
  * PDokResults
  * Handles the rendering of the results
@@ -55,9 +34,8 @@ class PDokResults extends EventHandler {
 
     // set root
     this.root = input;
-
-    // style
-    this.appendStyle();
+    this.id = `pdok-${Math.random().toString(36).substr(2, 9)}`;
+    this.root.dataset.pdokInput = this.id;
 
     // on up down key
     this.root.addEventListener("keydown", (e) => {
@@ -78,10 +56,11 @@ class PDokResults extends EventHandler {
 
       // fill input on enter
       if (e.key === "Enter") {
-        console.log(this.selected);
         this.fillInput(this.selected);
       }
     });
+
+    this.appendStyles();
   }
 
   check() {
@@ -100,50 +79,12 @@ class PDokResults extends EventHandler {
     console.warn(warning);
   }
 
-  appendStyle() {
-    let style = document.createElement("style");
-    style.innerHTML = `
-      input:focus:not([data-pdok-status]) + .pdok-results {
-        display:block;
-      }
+  move(input) {
+    let box = input.getBoundingClientRect();
 
-      .pdok-results {
-        display:none;
-        position: absolute;
-        z-index: 1000;
-        background-color: white;
-        border: 1px solid #ccc;
-        max-height: 200px;
-        overflow-y: auto;
-        list-style: none;
-        padding: 0;
-        margin: 0;
-      }
-      .pdok-results li {
-        padding: 10px;
-        cursor: pointer;
-      }
-
-      .pdok-results li:is(.is-selected, :hover) {
-        background-color: #f5f5f5;
-      }
-
-      [data-pdok-status] {
-        background-position: calc(100% - 10px) center;
-        background-size: 16px;
-        background-repeat: no-repeat;
-      }
-
-      [data-pdok-status="check"] {
-        background-image:  url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAADaElEQVRYR41XS2sUQRCupZdMfOW2EBDEg3EPgiAI3lRQb/tzc1Mh3hVBUQiKoCIKOfrKSgb8uvpVXV3TmV52dqa7Hl/XV9VTu6D5Yw+i91vxAVNbCldKvy9w+3OO6cUMoZuQ8d/ucORoxEeNYzx/6Cn2AFyA4qO8NWVlcNjxMm47rjnMjQ0GXnyG76kFZArAAYTX/S0P5MZt3DMIcCAgOgcOGhlhheYVpr9rmxaAO2DyamAUw8E4HMUHM9DsMMl6Pf/gJ/1lLGHaIfryj+iNBKEBHEBnnalkI3HYoS3rSdaQK3tgqC9x+ZEUJYBdLD9e+sj51THuq0OsRVGqhrSWcfkbDgbbfY7LXy8jAWwsg/VcAjUnKpAdEA7eTSaJFeOeDiWAUGppt4XUwrmwkSufEy8tyEKM99Jv4qHkK1PBEYDcJtsRW2ZHbKRYqvdSx6fI61hqrUzMIQDc2HP0MZ9wdQ4lQVXwkuBKoQevgBJ5cgQAA7hPZQahFKKurWKiSf6gx/xCahMi2KQkTwz4eAo2c3CzTPLbV2DncYjErkEnTAwgwPH1F6dFjFpfohLkyRc8Zue8e0WVOtM4MgDgAAB3Ktl0GpnPNbpm5xZ4h9LMByuMlggYHhw4GkN+JONTZ0XlvKo+mQLso4a14BJspiOaItuEllkacN1u7bDDUVAPPE2lzeIiAPzpCIjAWMk1kXBBqykA4z2RKTi/ElhCOpSkVdTkijmL8VfGw2O4MgBfj1vZUCn4Sl+DMPOityGZ77kKGgVMOIRs4i1cDhqVvI0d9XrMx7WPwNJHYE1X6JgemIiNSVnL2XaXv8mTxEP3RzGPTZOmE31AcKoLzWccWDUiZmETc/5lxAM9oFu3fW3LQ35jY0k3oJOBsBfew+8nsyGRWVrnI4qWZNHG58yF7odEglQRLRWVAVwn2v2KlqzX+mlgKv9y5Ve+/GF1pjpmoqfMJEbVlK4u0f7Jb7rbGi4zVkpV1EWBCmxSCr+vcf2WLBpt+c5tZNM1LkAjHCkJ2Wkq6Nz7TUOPUfkMibdSauqPyQq278k2rVtpvZDxO4HfCFU73olAtjYA9ZORUfhx3h+DpFdxkCYz5xrrnD+n+1AqeeFjmeipuWXb6vjgUusFaA4A1r+1osvvTuihaUyUYcC0PcLPry4zcfE/rwE6VS7cF4IAAAAASUVORK5CYII=');
-      }
-
-      [data-pdok-status="warn"] {
-        background-image:   url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAACjElEQVRYR51Xz0sdMRDOY4Vn0XoTSgvFSy1eBEXorS20PQjvzxU8tILeawUFbSkUW+iPeyuthwf9Jsm+zezOTGYN7BqTmck333zJ5k2Cv63B9Hlr3qAzjy8xwAlGf3tCTxxGm7ChJzd91TCc+gSnz9YaFoB7cHwlOxsgRIeNdyFc/5OmNABPYPzUwc4Yk1MY/+w7SAB2QmgeacUVaB4D4huMz0uHPoCc+RQ2t8nOwfbQxHR6j6i/WhAdgI2wHK7Da9+aygI0TE3aGZibYjyndQSrv2RaMjCTuExLdYxM0b9tw5jkV6k7KAGwrVZ17Wi6yhi26kIYRI2laBmYFUnWY3UWMQv4zoiUBkTNM8c8SGZwmNkBAWAn3HB1k48EIACA2gpBZ5si4gkBmDGlL2bRaaCaKKhWXUvosxQdAGxCE4ASAVcr0cvX5P8rAHIWPd9FbsV4BjCCQDg3IGGeQDsZKMvIUU1aAS0gVLcAC1AHMJQAy1ZhgHsZmOoAKnuqWgLdf0wJuij9ZHwAJBrT2Ee8KQa+nBWu4zw1flC4SqDjl/mxoXAOfAz4FdpDVGMl0WecYooCuiToPKe2dxcuqGwTFO8+Lm4vWIDqVozWH/D8yH4P8XdXAlFyIPBx3H2MVLmraGQABngBQPwYUSvugFIEtZYEgvS9y7XtkuElXL9ULyQqMZiwK2WASFPsQkLrLOOJV7Ku+cRggVTm3kYIaP1L6QOMKYrOoeo7q2Z4BoPvLTDpWr6Nycd3yKq2cAgrK1/Dzc1FGVv7YbIOaT0jltQijK8Ou45bDOS5fZB9+MZmQj7fhz77qPmheFv0/DhlupATH47mkbjVrCQ8AFr/VXReWpsv6TMufYzXH4+O/gPD3KU5b2HElgAAAABJRU5ErkJggg==');
-
-      }
-    `;
-    document.head.appendChild(style);
+    this.results.style.top = `${Math.floor(box.bottom + window.scrollY)}px`;
+    this.results.style.left = `${Math.floor(box.left)}px`;
+    this.results.style.width = `${box.width}px`;
   }
 
   /**
@@ -188,8 +129,6 @@ class PDokResults extends EventHandler {
    * @returns void
    */
   fillInput(index) {
-    console.log({ index });
-
     // when there are options and index is not set, set it to 0
     if (index === -1 || (index === -1 && this.data.length > 0)) index = 0;
 
@@ -198,8 +137,6 @@ class PDokResults extends EventHandler {
 
     // this.root.value = this.data[index].address.formatted;
     this.emit("select", this.data[index]);
-
-    console.log(this.data[index], this.data, index);
 
     // fire input event
     let event = new Event("input", { bubbles: true });
@@ -218,8 +155,7 @@ class PDokResults extends EventHandler {
     this.results = document.createElement("ul");
     this.results.classList.add("pdok-results");
     this.results.style.width = this.root.offsetWidth + "px";
-
-    console.log("render");
+    this.results.dataset.pdokResults = this.id;
 
     // render new results
     for (let [index, result] of Object.entries(data)) {
@@ -233,15 +169,26 @@ class PDokResults extends EventHandler {
         item.innerHTML = result.address.formatted;
       }
       // bind click event to fill input
-      console.log(item);
       item.addEventListener("pointerdown", () => this.fillInput(index));
 
       // append item to results
-      this.results.appendChild(item);
+      this.results.append(item);
     }
 
     // append results to root
-    this.root.insertAdjacentElement("afterend", this.results);
+    document.body.append(this.results);
+
+    this.move(this.root);
+  }
+
+  appendStyles() {
+    let style = document.createElement("style");
+    style.innerHTML = `
+    body:has([data-pdok-input="${this.id}"]:focus) [data-pdok-results="${this.id}"] {
+      display:block;
+    }
+    `;
+    document.head.append(style);
   }
 }
 
@@ -264,48 +211,41 @@ export default class PDokAutocomplete extends EventHandler {
     this.root = root;
     this.results = new PDokResults(root);
 
-    this.results.on("select", async (data) => {
-      this.root.value = data.address.formatted;
-
-      if (data.type !== "adres") return;
-
-      // has all values
-      let isValid = Object.values(data.address).filter(Boolean).length >= 4;
-
-      // filter out empty and undefined values
-      if (isValid) {
-        const info = await this.getInfo(data.address.formatted);
-        console.log(info);
-        this.root.value = info.address.formatted;
-
-        this.results.check();
-        this.checked = true;
-
-        if (info.address.formatted !== data.address.formatted) {
-          this.results.warn(
-            "Het geselecteerde adres is niet hetzelfde als het gevonden adres"
-          );
-        }
-        if (info?.warning) this.results.warn(info.warning);
-        this.emit("select", info);
-      }
-
-      // when type is address but is not valid
-      if (!isValid) {
-        this.emit("error", data);
-      }
-    });
+    this.results.on("select", async (data) => this.onSelect(data));
 
     // add event listeners
-    this.root.addEventListener("input", (e) => {
-      this.results.uncheck();
-      if (this?.checked) {
-        this.emit("unselect");
-        this.checked = false;
-      }
+    this.root.addEventListener("input", (e) => this.input(e));
+  }
 
-      this.input(e);
-    });
+  async onSelect(data) {
+    this.root.value = data.address.formatted;
+
+    if (data.type !== "adres") return;
+
+    // has all values
+    let isValid = Object.values(data.address).filter(Boolean).length >= 4;
+
+    // filter out empty and undefined values
+    if (isValid) {
+      const info = await this.getInfo(data.address.formatted);
+      this.root.value = info.address.formatted;
+
+      this.results.check();
+      this.checked = true;
+
+      if (info.address.formatted !== data.address.formatted) {
+        this.results.warn(
+          "Het geselecteerde adres is niet hetzelfde als het gevonden adres"
+        );
+      }
+      if (info?.warning) this.results.warn(info.warning);
+      this.emit("select", info);
+    }
+
+    // when type is address but is not valid
+    if (!isValid) {
+      this.emit("error", data);
+    }
   }
 
   async getSuggestions(value) {
@@ -350,6 +290,13 @@ export default class PDokAutocomplete extends EventHandler {
    * @returns void
    */
   async input(event) {
+    // reset check
+    this.results.uncheck();
+    if (this?.checked) {
+      this.emit("unselect");
+      this.checked = false;
+    }
+
     // get value
     const value = event.target.value;
 
