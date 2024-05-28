@@ -1,6 +1,7 @@
 import { EventHandler } from './EventHandler';
 import { RequestHandler } from './RequestHandler';
 
+
 /**
  * PDokAddress
  *
@@ -183,10 +184,16 @@ class PDokResults extends EventHandler {
 	}
 
 	render( data ) {
+		data = data || [];
 		this.data = data;
 		this.selected = -1;
 
-		// remove old results
+		if (this.root.value === '') {
+			this.results?.remove();
+			return;
+		}
+
+		// setup results elements
 		this.results?.remove();
 		this.results = document.createElement( 'div' );
 		const ul = document.createElement( 'ul' );
@@ -197,12 +204,9 @@ class PDokResults extends EventHandler {
 		// append results to root
 		document.body.append( this.results );
 
-		if ( data.length === 0 ) {
-			// this.warn('Geen resultaten gevonden');
-		}
-
 		// render new results
 		for ( const [ index, result ] of Object.entries( data ) ) {
+			
 			// create item
 			const item = document.createElement( 'li' );
 
@@ -279,6 +283,12 @@ export default class PDokAutocomplete extends EventHandler {
 		} );
 
 		this.root.addEventListener( 'input', ( e ) => this.input( e ) );
+		this.root.addEventListener( 'click', ( e ) => this.results.move( this.root ) );
+
+		if ( this.root.value !== '') {
+			this.setInfo( this.root.value );
+			this.renderSuggestions(this.root.value);
+		}
 	}
 
 	async onSelect( data ) {
@@ -292,9 +302,10 @@ export default class PDokAutocomplete extends EventHandler {
 		const isValid = Object.values( data.address ).filter( Boolean ).length >= 4;
 
 		if ( isValid ) {
+			// this.setInfo(data.address.formatted)
 			this.results.startLoader();
-			const info = await this.getInfo( data.address.formatted );
-			// const idInfo = await this.getInfoByID( data.id, data.address.formatted );
+			// const info = await this.getInfo( data.address.formatted );
+			const info = await this.getInfoByID( data.id, data.address.formatted );
 
 			this.results.stopLoader();
 
@@ -317,6 +328,28 @@ export default class PDokAutocomplete extends EventHandler {
 		// when type is address but is not valid
 		if ( ! isValid ) {
 			this.emit( 'error', data );
+		}
+	}
+
+	async setInfo( address ) {
+		this.results.startLoader();
+		const info = await this.getInfo( address );
+
+		this.results.stopLoader();
+
+		// check if the info is the same as the selected address
+		if ( info.address.formatted === address ) {
+			this.checked = true;
+			this.results.check();
+			this.emit( 'select', info );
+		} else {
+			this.results.warn(
+				'Dit adres bestaat niet of is een gedeeld adres'
+			);
+		}
+
+		if ( info?.warning ) {
+			this.results.warn( info.warning );
 		}
 	}
 
@@ -427,6 +460,11 @@ export default class PDokAutocomplete extends EventHandler {
 
 		// get value
 		const value = event.target.value;
+		this.renderSuggestions(value);
+
+	}
+
+	async renderSuggestions(value) {
 
 		// if empty, render empty results
 		if ( value.length === 0 ) {
@@ -595,8 +633,6 @@ export default class PDokAutocomplete extends EventHandler {
 
 		// filter out empty results that are false
 		newDocs = newDocs.filter( ( doc ) => doc !== false );
-
-		console.log( newDocs );
 
 		return newDocs;
 	}
